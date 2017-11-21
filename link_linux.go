@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -785,7 +786,7 @@ func LinkAdd(link Link) error {
 }
 
 // LinkAdd adds a new link device. The type and features of the device
-// are taken fromt the parameters in the link object.
+// are taken from the parameters in the link object.
 // Equivalent to: `ip link add $link`
 func (h *Handle) LinkAdd(link Link) error {
 	return h.linkModify(link, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
@@ -795,7 +796,10 @@ func (h *Handle) linkModify(link Link, flags int) error {
 	// TODO: support extra data for macvlan
 	base := link.Attrs()
 
-	if base.Name == "" {
+	// if tuntap, then the name can be empty, OS will provide a name
+	_, isTuntap := link.(*Tuntap)
+
+	if base.Name == "" && !isTuntap {
 		return fmt.Errorf("LinkAttrs.Name cannot be empty!")
 	}
 
@@ -845,12 +849,19 @@ func (h *Handle) linkModify(link Link, flags int) error {
 				cleanupFds(fds)
 				return fmt.Errorf("Tuntap IOCTL TUNSETIFF failed [%d], errno %v", i, errno)
 			}
+			// we only care for the name of the first tap in the multi queue set
+			// if the original name was empty, the OS has now the actual name
+			if i == 0 {
+				link.Attrs().Name = strings.Trim(string(localReq.Name[:]), "\x00")
+			}
 		}
 
-		_, _, errno := unix.Syscall(unix.SYS_IOCTL, fds[0].Fd(), uintptr(unix.TUNSETPERSIST), 1)
-		if errno != 0 {
-			cleanupFds(fds)
-			return fmt.Errorf("Tuntap IOCTL TUNSETPERSIST failed, errno %v", errno)
+		if tuntap.Persist {
+			_, _, errno := unix.Syscall(unix.SYS_IOCTL, fds[0].Fd(), uintptr(unix.TUNSETPERSIST), 1)
+			if errno != 0 {
+				cleanupFds(fds)
+				return fmt.Errorf("Tuntap IOCTL TUNSETPERSIST failed, errno %v", errno)
+			}
 		}
 
 		h.ensureIndex(base)
