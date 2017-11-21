@@ -806,7 +806,6 @@ func (h *Handle) linkModify(link Link, flags int) error {
 	if tuntap, ok := link.(*Tuntap); ok {
 		// TODO: support user
 		// TODO: support group
-		// TODO: support non- persistent
 		if tuntap.Mode < unix.IFF_TUN || tuntap.Mode > unix.IFF_TAP {
 			return fmt.Errorf("Tuntap.Mode %v unknown!", tuntap.Mode)
 		}
@@ -849,8 +848,8 @@ func (h *Handle) linkModify(link Link, flags int) error {
 				cleanupFds(fds)
 				return fmt.Errorf("Tuntap IOCTL TUNSETIFF failed [%d], errno %v", i, errno)
 			}
-			// we only care for the name of the first tap in the multi queue set
-			// if the original name was empty, the OS has now the actual name
+			// 1) we only care for the name of the first tap in the multi queue set
+			// 2) if the original name was empty, the localReq has now the actual name
 			if i == 0 {
 				link.Attrs().Name = strings.Trim(string(localReq.Name[:]), "\x00")
 			}
@@ -871,7 +870,11 @@ func (h *Handle) linkModify(link Link, flags int) error {
 			// TODO: verify MasterIndex is actually a bridge?
 			err := h.LinkSetMasterByIndex(link, base.MasterIndex)
 			if err != nil {
-				_, _, _ = unix.Syscall(unix.SYS_IOCTL, fds[0].Fd(), uintptr(unix.TUNSETPERSIST), 0)
+				// un-persist (e.g. allow the interface to be removed) the tuntap
+				// should not hurt if not set prior, condition might be not needed
+				if tuntap.Persist {
+					_, _, _ = unix.Syscall(unix.SYS_IOCTL, fds[0].Fd(), uintptr(unix.TUNSETPERSIST), 0)
+				}
 				cleanupFds(fds)
 				return err
 			}
