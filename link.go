@@ -262,6 +262,9 @@ const (
 type Macvlan struct {
 	LinkAttrs
 	Mode MacvlanMode
+
+	// MACAddrs is only populated for Macvlan SOURCE links
+	MACAddrs []net.HardwareAddr
 }
 
 func (macvlan *Macvlan) Attrs() *LinkAttrs {
@@ -703,6 +706,9 @@ func (gretap *Gretap) Attrs() *LinkAttrs {
 }
 
 func (gretap *Gretap) Type() string {
+	if gretap.Local.To4() == nil {
+		return "ip6gretap"
+	}
 	return "gretap"
 }
 
@@ -791,6 +797,9 @@ func (gretun *Gretun) Attrs() *LinkAttrs {
 }
 
 func (gretun *Gretun) Type() string {
+	if gretun.Local.To4() == nil {
+		return "ip6gre"
+	}
 	return "gre"
 }
 
