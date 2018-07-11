@@ -4,7 +4,7 @@ import (
 	"errors"
 	"syscall"
 
-	"github.com/vishvananda/netlink/nl"
+	"github.com/rschmied/netlink/nl"
 	"golang.org/x/sys/unix"
 )
 
