@@ -1011,7 +1011,8 @@ func (h *Handle) linkModify(link Link, flags int) error {
 			}
 		}
 
-		if tuntap.Persist {
+		// only persist interface if NonPersist is NOT set
+		if !tuntap.NonPersist {
 			_, _, errno := unix.Syscall(unix.SYS_IOCTL, fds[0].Fd(), uintptr(unix.TUNSETPERSIST), 1)
 			if errno != 0 {
 				cleanupFds(fds)
@@ -1028,7 +1029,7 @@ func (h *Handle) linkModify(link Link, flags int) error {
 			if err != nil {
 				// un-persist (e.g. allow the interface to be removed) the tuntap
 				// should not hurt if not set prior, condition might be not needed
-				if tuntap.Persist {
+				if !tuntap.NonPersist {
 					_, _, _ = unix.Syscall(unix.SYS_IOCTL, fds[0].Fd(), uintptr(unix.TUNSETPERSIST), 0)
 				}
 				cleanupFds(fds)
